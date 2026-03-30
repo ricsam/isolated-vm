@@ -47,6 +47,7 @@ class StringTable {
 		String accessors{"accessors"};
 		String arguments{"arguments"};
 		String async{"async"};
+		String asyncContext{"asyncContext"};
 		String boolean{"boolean"};
 		String cachedData{"cachedData"};
 		String cachedDataRejected{"cachedDataRejected"};
@@ -58,11 +59,13 @@ class StringTable {
 		String externalCopy{"externalCopy"};
 		String filename{"filename"};
 		String function{"function"};
+		String getContinuationPreservedEmbedderData{"getContinuationPreservedEmbedderData"};
 		String global{"global"};
 		String ignored{"ignored"};
 		String inspector{"inspector"};
 		String isolateIsDisposed{"Isolate is disposed"};
 		String isolatedVm{"isolated-vm"};
+		String ivmAsyncContextInternal{"__ivmAsyncContextInternal"};
 		String length{"length"};
 		String lineOffset{"lineOffset"};
 		String message{"message"};
@@ -80,6 +83,7 @@ class StringTable {
 		String snapshot{"snapshot"};
 		String stack{"stack"};
 		String string{"string"};
+		String setContinuationPreservedEmbedderData{"setContinuationPreservedEmbedderData"};
 		String timeout{"timeout"};
 		String transferIn{"transferIn"};
 		String transferList{"transferList"};

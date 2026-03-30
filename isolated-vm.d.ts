@@ -159,6 +159,7 @@ declare namespace IsolatedVM {
 
 	export type ContextOptions = {
 		inspector?: boolean;
+		asyncContext?: boolean;
 	};
 
 	export type HeapStatistics = {

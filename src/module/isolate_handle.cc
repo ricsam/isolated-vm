@@ -27,6 +27,220 @@ using std::shared_ptr;
 using std::unique_ptr;
 
 namespace ivm {
+namespace {
+
+constexpr char kAsyncContextBootstrapSource[] = R"JS(
+(function() {
+  if (globalThis.AsyncContext) {
+    return;
+  }
+
+  const native = globalThis.__ivmAsyncContextInternal;
+  if (
+    !native ||
+    typeof native.getContinuationPreservedEmbedderData !== "function" ||
+    typeof native.setContinuationPreservedEmbedderData !== "function"
+  ) {
+    throw new Error("AsyncContext intrinsics are not available in this context");
+  }
+
+  class AsyncContextFrame extends Map {
+    constructor(store, value) {
+      super(AsyncContextFrame.current() ?? undefined);
+      if (arguments.length > 0) {
+        this.set(store, value);
+      }
+    }
+
+    static current() {
+      return native.getContinuationPreservedEmbedderData();
+    }
+
+    static set(frame) {
+      native.setContinuationPreservedEmbedderData(frame);
+    }
+
+    static exchange(frame) {
+      const prior = this.current();
+      this.set(frame);
+      return prior;
+    }
+  }
+
+  const variableMeta = new WeakMap();
+  class Variable {
+    constructor(options = {}) {
+      const name = options && typeof options === "object" && "name" in options
+        ? String(options.name)
+        : "";
+      const defaultValue = options && typeof options === "object"
+        ? options.defaultValue
+        : undefined;
+      variableMeta.set(this, { name, defaultValue });
+    }
+
+    run(value, fn, ...args) {
+      if (typeof fn !== "function") {
+        throw new TypeError("AsyncContext.Variable.run requires a function");
+      }
+      const frame = new AsyncContextFrame(this, value);
+      const prior = AsyncContextFrame.exchange(frame);
+      try {
+        return Reflect.apply(fn, undefined, args);
+      } finally {
+        AsyncContextFrame.set(prior);
+      }
+    }
+
+    get() {
+      const meta = variableMeta.get(this);
+      if (!meta) {
+        throw new TypeError("Receiver must be an AsyncContext.Variable");
+      }
+      const frame = AsyncContextFrame.current();
+      if (!frame?.has(this)) {
+        return meta.defaultValue;
+      }
+      return frame.get(this);
+    }
+
+    get name() {
+      const meta = variableMeta.get(this);
+      if (!meta) {
+        throw new TypeError("Receiver must be an AsyncContext.Variable");
+      }
+      return meta.name;
+    }
+  }
+
+  const snapshotMeta = new WeakMap();
+  class Snapshot {
+    constructor() {
+      snapshotMeta.set(this, AsyncContextFrame.current());
+    }
+
+    run(fn, ...args) {
+      if (typeof fn !== "function") {
+        throw new TypeError("AsyncContext.Snapshot.run requires a function");
+      }
+      if (!snapshotMeta.has(this)) {
+        throw new TypeError("Receiver must be an AsyncContext.Snapshot");
+      }
+      const prior = AsyncContextFrame.exchange(snapshotMeta.get(this));
+      try {
+        return Reflect.apply(fn, undefined, args);
+      } finally {
+        AsyncContextFrame.set(prior);
+      }
+    }
+
+    static wrap(fn) {
+      if (typeof fn !== "function") {
+        throw new TypeError("AsyncContext.Snapshot.wrap requires a function");
+      }
+      const frame = AsyncContextFrame.current();
+      function wrapped(...args) {
+        const prior = AsyncContextFrame.exchange(frame);
+        try {
+          return Reflect.apply(fn, this, args);
+        } finally {
+          AsyncContextFrame.set(prior);
+        }
+      }
+      try {
+        Object.defineProperty(wrapped, "name", {
+          configurable: true,
+          value: fn.name ? "wrapped " + fn.name : "wrapped",
+        });
+      } catch {}
+      return wrapped;
+    }
+  }
+
+  Object.defineProperty(Variable.prototype, Symbol.toStringTag, {
+    configurable: true,
+    enumerable: false,
+    value: "AsyncContext.Variable",
+  });
+  Object.defineProperty(Snapshot.prototype, Symbol.toStringTag, {
+    configurable: true,
+    enumerable: false,
+    value: "AsyncContext.Snapshot",
+  });
+
+  const AsyncContext = {};
+  Object.defineProperty(AsyncContext, "Variable", {
+    configurable: true,
+    enumerable: false,
+    writable: true,
+    value: Variable,
+  });
+  Object.defineProperty(AsyncContext, "Snapshot", {
+    configurable: true,
+    enumerable: false,
+    writable: true,
+    value: Snapshot,
+  });
+  Object.defineProperty(AsyncContext, Symbol.toStringTag, {
+    configurable: true,
+    enumerable: false,
+    value: "AsyncContext",
+  });
+
+  Object.defineProperty(globalThis, "AsyncContext", {
+    configurable: true,
+    enumerable: false,
+    writable: true,
+    value: AsyncContext,
+  });
+})();
+)JS";
+
+void GetContinuationPreservedEmbedderDataCallback(const FunctionCallbackInfo<Value>& info) {
+	auto* isolate = info.GetIsolate();
+	auto value = isolate->GetContinuationPreservedEmbedderData();
+	if (value.IsEmpty()) {
+		info.GetReturnValue().Set(Undefined(isolate));
+		return;
+	}
+	info.GetReturnValue().Set(value);
+}
+
+void SetContinuationPreservedEmbedderDataCallback(const FunctionCallbackInfo<Value>& info) {
+	auto* isolate = info.GetIsolate();
+	Local<Value> value = info.Length() > 0 ? info[0] : Undefined(isolate);
+	isolate->SetContinuationPreservedEmbedderData(value);
+	info.GetReturnValue().Set(value);
+}
+
+void InstallAsyncContextIntrinsics(Local<Context> context) {
+	auto* isolate = context->GetIsolate();
+	Context::Scope context_scope{context};
+	Local<Object> internal = Object::New(isolate);
+	Local<Function> getter = Unmaybe(Function::New(context, GetContinuationPreservedEmbedderDataCallback));
+	Local<Function> setter = Unmaybe(Function::New(context, SetContinuationPreservedEmbedderDataCallback));
+	Unmaybe(internal->DefineOwnProperty(
+		context,
+		StringTable::Get().getContinuationPreservedEmbedderData,
+		getter,
+		static_cast<PropertyAttribute>(PropertyAttribute::DontEnum | PropertyAttribute::ReadOnly)
+	));
+	Unmaybe(internal->DefineOwnProperty(
+		context,
+		StringTable::Get().setContinuationPreservedEmbedderData,
+		setter,
+		static_cast<PropertyAttribute>(PropertyAttribute::DontEnum | PropertyAttribute::ReadOnly)
+	));
+	Unmaybe(context->Global()->DefineOwnProperty(
+		context,
+		StringTable::Get().ivmAsyncContextInternal,
+		internal,
+		static_cast<PropertyAttribute>(PropertyAttribute::DontEnum | PropertyAttribute::ReadOnly)
+	));
+	Unmaybe(Unmaybe(Script::Compile(context, v8_string(kAsyncContextBootstrapSource)))->Run(context));
+}
+
+} // anonymous namespace
 
 /**
  * IsolateHandle implementation
@@ -133,11 +347,13 @@ auto IsolateHandle::TransferOut() -> unique_ptr<Transferable> {
  */
 struct CreateContextRunner : public ThreePhaseTask {
 	bool enable_inspector = false;
+	bool enable_async_context = false;
 	RemoteHandle<Context> context;
 	RemoteHandle<Value> global;
 
 	explicit CreateContextRunner(MaybeLocal<Object>& maybe_options) {
 		enable_inspector = ReadOption<bool>(maybe_options, StringTable::Get().inspector, false);
+		enable_async_context = ReadOption<bool>(maybe_options, StringTable::Get().asyncContext, false);
 	}
 
 	void Phase2() final {
@@ -161,6 +377,9 @@ struct CreateContextRunner : public ThreePhaseTask {
 		// Make a new context and setup shared pointers
 		IsolateEnvironment::HeapCheck heap_check{env, true};
 		Local<Context> context_handle = env.NewContext();
+		if (enable_async_context) {
+			InstallAsyncContextIntrinsics(context_handle);
+		}
 		if (enable_inspector) {
 			env.GetInspectorAgent()->ContextCreated(context_handle, "<isolated-vm>");
 		}

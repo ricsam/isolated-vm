@@ -1,5 +1,5 @@
 {
-  "name": "isolated-vm",
+  "name": "@ricsam/isolated-vm",
   "version": "6.1.2",
   "description": "Access to multiple isolates",
   "main": "isolated-vm.js",
@@ -18,18 +18,18 @@
     "node-gyp-build": "^4.8.4"
   },
   "devDependencies": {
-    "isolated-vm": ".",
+    "@ricsam/isolated-vm": ".",
     "prebuildify": "^6.0.1"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/laverdet/isolated-vm.git"
+    "url": "git+https://github.com/ricsam/isolated-vm.git"
   },
-  "author": "https://github.com/laverdet/",
+  "author": "ricsam <oss@ricsam.dev>",
   "license": "ISC",
   "gypfile": true,
   "bugs": {
-    "url": "https://github.com/laverdet/isolated-vm/issues"
+    "url": "https://github.com/ricsam/isolated-vm/issues"
   },
-  "homepage": "https://github.com/laverdet/isolated-vm#readme"
+  "homepage": "https://github.com/ricsam/isolated-vm#readme"
 }
