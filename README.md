@@ -8,6 +8,21 @@ isolated-vm -- Access to multiple isolates in nodejs
 
 [![NPM](https://nodei.co/npm/isolated-vm.png)](https://www.npmjs.com/package/isolated-vm)
 
+FORK NOTICE
+-----------
+
+`@ricsam/isolated-vm` is a fork of [`laverdet/isolated-vm`](https://github.com/laverdet/isolated-vm).
+
+This fork currently adds:
+
+- `createContext({ asyncContext: true })`
+- a sandbox `AsyncContext` global with `AsyncContext.Variable` and `AsyncContext.Snapshot`
+- continuation-preserved async context propagation for promise and `await` chains, used by `@ricsam/isolate` for async context support
+
+This package is operated from [`ricsam/isolate`](https://github.com/ricsam/isolate), where CI, release automation, and integration work live. The separate fork repository is kept so it can be rebased onto upstream more easily.
+
+Original upstream repository: [`laverdet/isolated-vm`](https://github.com/laverdet/isolated-vm)
+
 `isolated-vm` is a library for nodejs which gives you access to v8's `Isolate` interface. This
 allows you to create JavaScript environments which are completely *isolated* from each other. This
 can be a powerful tool to run code in a fresh JavaScript environment completely free of extraneous
