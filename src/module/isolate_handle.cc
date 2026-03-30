@@ -213,12 +213,46 @@ void SetContinuationPreservedEmbedderDataCallback(const FunctionCallbackInfo<Val
 	info.GetReturnValue().Set(value);
 }
 
+auto ReadPromiseHook(
+	const FunctionCallbackInfo<Value>& info,
+	int index,
+	const char* error_message
+) -> Local<Function> {
+	auto* isolate = info.GetIsolate();
+	if (info.Length() <= index) {
+		return {};
+	}
+
+	Local<Value> value = info[index];
+	if (value->IsUndefined() || value->IsNull()) {
+		return {};
+	}
+	if (!value->IsFunction()) {
+		Context::Scope context_scope{isolate->GetCurrentContext()};
+		throw RuntimeTypeError(error_message);
+	}
+	return value.As<Function>();
+}
+
+void SetPromiseHooksCallback(const FunctionCallbackInfo<Value>& info) {
+	auto* isolate = info.GetIsolate();
+	Local<Context> context = isolate->GetCurrentContext();
+	context->SetPromiseHooks(
+		ReadPromiseHook(info, 0, "`initHook` must be a function or undefined"),
+		ReadPromiseHook(info, 1, "`beforeHook` must be a function or undefined"),
+		ReadPromiseHook(info, 2, "`afterHook` must be a function or undefined"),
+		ReadPromiseHook(info, 3, "`resolveHook` must be a function or undefined")
+	);
+	info.GetReturnValue().Set(Undefined(isolate));
+}
+
 void InstallAsyncContextIntrinsics(Local<Context> context) {
 	auto* isolate = context->GetIsolate();
 	Context::Scope context_scope{context};
 	Local<Object> internal = Object::New(isolate);
 	Local<Function> getter = Unmaybe(Function::New(context, GetContinuationPreservedEmbedderDataCallback));
 	Local<Function> setter = Unmaybe(Function::New(context, SetContinuationPreservedEmbedderDataCallback));
+	Local<Function> set_promise_hooks = Unmaybe(Function::New(context, SetPromiseHooksCallback));
 	Unmaybe(internal->DefineOwnProperty(
 		context,
 		StringTable::Get().getContinuationPreservedEmbedderData,
@@ -229,6 +263,12 @@ void InstallAsyncContextIntrinsics(Local<Context> context) {
 		context,
 		StringTable::Get().setContinuationPreservedEmbedderData,
 		setter,
+		static_cast<PropertyAttribute>(PropertyAttribute::DontEnum | PropertyAttribute::ReadOnly)
+	));
+	Unmaybe(internal->DefineOwnProperty(
+		context,
+		StringTable::Get().setPromiseHooks,
+		set_promise_hooks,
 		static_cast<PropertyAttribute>(PropertyAttribute::DontEnum | PropertyAttribute::ReadOnly)
 	));
 	Unmaybe(context->Global()->DefineOwnProperty(

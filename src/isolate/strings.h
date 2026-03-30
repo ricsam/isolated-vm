@@ -84,6 +84,7 @@ class StringTable {
 		String stack{"stack"};
 		String string{"string"};
 		String setContinuationPreservedEmbedderData{"setContinuationPreservedEmbedderData"};
+		String setPromiseHooks{"setPromiseHooks"};
 		String timeout{"timeout"};
 		String transferIn{"transferIn"};
 		String transferList{"transferList"};

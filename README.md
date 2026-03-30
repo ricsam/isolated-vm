@@ -17,6 +17,7 @@ This fork currently adds:
 
 - `createContext({ asyncContext: true })`
 - a sandbox `AsyncContext` global with `AsyncContext.Variable` and `AsyncContext.Snapshot`
+- `__ivmAsyncContextInternal.setPromiseHooks(...)` for per-context Promise lifecycle hooks
 - continuation-preserved async context propagation for promise and `await` chains, used by `@ricsam/isolate` for async context support
 
 This package is operated from [`ricsam/isolate`](https://github.com/ricsam/isolate), where CI, release automation, and integration work live. The separate fork repository is kept so it can be rebased onto upstream more easily.
