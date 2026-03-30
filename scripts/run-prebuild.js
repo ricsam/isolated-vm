@@ -7,8 +7,6 @@ const targetArgs = [
   '--strip',
   '--no-napi',
   '--target',
-  '22.22.0',
-  '--target',
   '24.14.0',
 ];
 
